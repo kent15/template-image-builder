@@ -7,26 +7,29 @@ using Microsoft.Extensions.Logging;
 namespace ImageBatchGenerator.Application.Orchestration;
 
 /// <summary>
-/// ジョブオーケストレーター（Phase 1: 順次処理）
+/// ジョブオーケストレーター
 /// JobQueueWorker から呼び出され、1ジョブの処理フロー全体を統括する
-/// Phase 2以降: BatchCoordinator に並列処理を委譲する
+/// アイテムの並列処理は BatchCoordinator に委譲する
 /// </summary>
 public class JobOrchestrator
 {
     private readonly IJobRepository _jobRepository;
     private readonly IJobItemRepository _jobItemRepository;
     private readonly IJobCancellationRegistry _cancellationRegistry;
+    private readonly BatchCoordinator _batchCoordinator;
     private readonly ILogger<JobOrchestrator> _logger;
 
     public JobOrchestrator(
         IJobRepository jobRepository,
         IJobItemRepository jobItemRepository,
         IJobCancellationRegistry cancellationRegistry,
+        BatchCoordinator batchCoordinator,
         ILogger<JobOrchestrator> logger)
     {
         _jobRepository = jobRepository;
         _jobItemRepository = jobItemRepository;
         _cancellationRegistry = cancellationRegistry;
+        _batchCoordinator = batchCoordinator;
         _logger = logger;
     }
 
@@ -65,24 +68,22 @@ public class JobOrchestrator
             return;
         }
 
-        // Running へ遷移
         job.Start();
         await _jobRepository.UpdateAsync(job);
         _logger.LogInformation("Job {JobId} started. TotalCount={Total}", jobId, job.TotalCount);
 
-        // Pending の JobItem を順次処理
         var pendingItems = await _jobItemRepository
             .GetByJobIdAndStatusAsync(jobId, JobItemStatus.Pending);
 
-        foreach (var item in pendingItems)
+        try
         {
-            if (ct.IsCancellationRequested)
-                break;
-
-            await ProcessItemAsync(job, item, ct);
+            await _batchCoordinator.ProcessAsync(job, pendingItems, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // キャンセルは完了判定で処理する
         }
 
-        // 完了 or キャンセル確定
         if (ct.IsCancellationRequested)
         {
             job.Cancel();
@@ -100,28 +101,6 @@ public class JobOrchestrator
     }
 
     /// <summary>
-    /// 1件の JobItem を処理する（Phase 1: モック。Phase 2以降で実画像生成に差し替え）
-    /// </summary>
-    private async Task ProcessItemAsync(Job job, JobItem item, CancellationToken ct)
-    {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-        item.MarkRunning();
-        await _jobItemRepository.UpdateAsync(item);
-
-        // Phase 2以降: IImageProcessor.GenerateAsync() + IStorageService.SaveAsync()
-        await Task.Yield(); // 非同期継続を確保するプレースホルダー
-
-        sw.Stop();
-        item.MarkSuccess((int)sw.ElapsedMilliseconds);
-        job.IncrementProgress(success: true, warning: false, error: false);
-        job.UpdateCheckpoint(item.RowIndex);
-
-        await _jobItemRepository.UpdateAsync(item);
-        await _jobRepository.UpdateAsync(job);
-    }
-
-    /// <summary>
     /// チェックポイントから処理を再開する（Resume 対応）
     /// </summary>
     public async Task ResumeJobAsync(Guid jobId, CancellationToken ct = default)
@@ -132,13 +111,11 @@ public class JobOrchestrator
         var pendingItems = await _jobItemRepository
             .GetPendingAfterIndexAsync(jobId, job.LastProcessedIndex);
 
-        foreach (var item in pendingItems)
+        try
         {
-            if (ct.IsCancellationRequested)
-                break;
-
-            await ProcessItemAsync(job, item, ct);
+            await _batchCoordinator.ProcessAsync(job, pendingItems, ct);
         }
+        catch (OperationCanceledException) { }
 
         if (!ct.IsCancellationRequested)
             job.Complete();

@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using ImageBatchGenerator.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 
@@ -5,61 +6,92 @@ namespace ImageBatchGenerator.Infrastructure.Storage;
 
 /// <summary>
 /// ローカルファイルシステムストレージサービス実装
-/// appsettings.jsonのStorage設定から出力先を取得する
+/// appsettings.json の Storage:OutputBasePath を出力先ルートとして使用する
 /// </summary>
 public class LocalStorageService : IStorageService
 {
-    // TODO: Phase 2でIConfigurationから設定を注入
     private readonly string _outputBasePath;
-    private readonly string _csvUploadPath;
-    private readonly string _assetPath;
 
     public LocalStorageService(IConfiguration configuration)
     {
-        // TODO: Phase 2で実装
-        // _outputBasePath = configuration["Storage:OutputBasePath"] ?? "C:\\ImageBatch\\Output";
-        // _csvUploadPath  = configuration["Storage:CsvUploadPath"]  ?? "C:\\ImageBatch\\Csv";
-        // _assetPath      = configuration["Storage:AssetPath"]      ?? "C:\\ImageBatch\\Assets";
-        _outputBasePath = string.Empty;
-        _csvUploadPath = string.Empty;
-        _assetPath = string.Empty;
+        _outputBasePath = configuration["Storage:OutputBasePath"] ?? "data/output";
+        Directory.CreateDirectory(_outputBasePath);
     }
 
+    /// <summary>
+    /// ファイルを保存し、相対ストレージパスを返す
+    /// 保存先: {outputBasePath}/{subDirectory}/{fileName}
+    /// </summary>
     public async Task<string> SaveAsync(
         Stream content,
         string fileName,
         string subDirectory,
         CancellationToken ct = default)
     {
-        // TODO: Phase 2で実装
-        // 1. サブディレクトリを作成する
-        // 2. ファイル名の重複を防ぐためGUID+元ファイル名で保存
-        // 3. ストレージパス（相対パス）を返す
-        throw new NotImplementedException();
+        var dir = Path.Combine(_outputBasePath, subDirectory);
+        Directory.CreateDirectory(dir);
+
+        var fullPath = Path.Combine(dir, fileName);
+        await using var fs = new FileStream(
+            fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+        await content.CopyToAsync(fs, ct);
+
+        return Path.Combine(subDirectory, fileName);
     }
 
+    /// <summary>
+    /// ストレージパスからファイルを読み込み MemoryStream として返す（呼び出し元で Dispose 不要）
+    /// </summary>
     public async Task<Stream> ReadAsync(string storagePath, CancellationToken ct = default)
     {
-        // TODO: Phase 2で実装
-        throw new NotImplementedException();
+        var fullPath = Path.Combine(_outputBasePath, storagePath);
+        var ms = new MemoryStream();
+
+        await using var fs = new FileStream(
+            fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+        await fs.CopyToAsync(ms, ct);
+
+        ms.Position = 0;
+        return ms;
     }
 
-    public async Task DeleteAsync(string storagePath, CancellationToken ct = default)
+    public Task DeleteAsync(string storagePath, CancellationToken ct = default)
     {
-        // TODO: Phase 2で実装
-        throw new NotImplementedException();
+        var fullPath = Path.Combine(_outputBasePath, storagePath);
+        if (File.Exists(fullPath))
+            File.Delete(fullPath);
+
+        return Task.CompletedTask;
     }
 
-    public async Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
-    {
-        // TODO: Phase 2で実装
-        throw new NotImplementedException();
-    }
+    public Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
+        => Task.FromResult(File.Exists(Path.Combine(_outputBasePath, storagePath)));
 
+    /// <summary>
+    /// ジョブ出力ディレクトリの全ファイルを ZIP アーカイブとして返す
+    /// </summary>
     public async Task<Stream> CreateZipArchiveAsync(Guid jobId, CancellationToken ct = default)
     {
-        // TODO: Phase 3で実装
-        // System.IO.Compression.ZipArchiveを使用して生成画像をZIPにまとめる
-        throw new NotImplementedException();
+        var jobDir = Path.Combine(_outputBasePath, jobId.ToString());
+        var ms = new MemoryStream();
+
+        using var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true);
+
+        if (Directory.Exists(jobDir))
+        {
+            foreach (var filePath in Directory.GetFiles(jobDir).OrderBy(f => f))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var entry = archive.CreateEntry(Path.GetFileName(filePath), CompressionLevel.Optimal);
+                await using var entryStream = entry.Open();
+                await using var fs = new FileStream(
+                    filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+                await fs.CopyToAsync(entryStream, ct);
+            }
+        }
+
+        ms.Position = 0;
+        return ms;
     }
 }
