@@ -12,14 +12,21 @@
     <ProjectReference Include="..\ImageBatchGenerator.Application\ImageBatchGenerator.Application.csproj" />
   </ItemGroup>
 
-  <!-- NuGetパッケージ（Phase 1で追加予定） -->
+  <!-- 画像処理: SixLabors.ImageSharp（Apache-2.0） -->
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
+  </ItemGroup>
+
+  <!-- ロギング -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.*" />
+  </ItemGroup>
+
+  <!-- Phase 2以降で追加予定 -->
   <ItemGroup>
     <!-- TODO: dotnet add package Microsoft.EntityFrameworkCore.SqlServer -->
-    <!-- TODO: dotnet add package Microsoft.EntityFrameworkCore.Tools -->
-    <!-- TODO: dotnet add package SkiaSharp -->
-    <!-- TODO: dotnet add package SkiaSharp.HarfBuzz -->
     <!-- TODO: dotnet add package Serilog.AspNetCore -->
-    <!-- TODO: dotnet add package Serilog.Sinks.MSSqlServer -->
     <!-- TODO: dotnet add package Microsoft.AspNetCore.SignalR.Client -->
   </ItemGroup>
 

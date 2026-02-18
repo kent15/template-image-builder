@@ -2,6 +2,7 @@ using ImageBatchGenerator.Application.Interfaces;
 using ImageBatchGenerator.Application.Orchestration;
 using ImageBatchGenerator.Application.UseCases.Jobs;
 using ImageBatchGenerator.Domain.Interfaces;
+using ImageBatchGenerator.Infrastructure.ImageProcessing;
 using ImageBatchGenerator.Infrastructure.Jobs;
 using ImageBatchGenerator.Infrastructure.Persistence.Repositories;
 using ImageBatchGenerator.Infrastructure.Queue;
@@ -28,6 +29,9 @@ builder.Services.AddSingleton<IJobQueue, InMemoryJobQueue>();
 
 // ── キャンセルレジストリ ──────────────────────────────────────
 builder.Services.AddSingleton<IJobCancellationRegistry, InMemoryJobCancellationRegistry>();
+
+// ── 画像処理（ImageSharp） ──────────────────────────────────
+builder.Services.AddScoped<IImageProcessor, ImageSharpProcessor>();
 
 // ── ユースケース ────────────────────────────────────────────
 builder.Services.AddScoped<CreateJobUseCase>();
