@@ -6,18 +6,15 @@ using Microsoft.Extensions.Logging;
 namespace ImageBatchGenerator.Web.BackgroundServices;
 
 /// <summary>
-/// ジョブキュー監視バックグラウンドサービス
-/// IHostedServiceとして起動し、IJobQueueを常時監視してジョブを実行する
-/// 最大同時実行ジョブ数はappsettingsで制御する
+/// ジョブキュー監視バックグラウンドサービス（Phase 1: 順次処理）
+/// IJobQueue を常時監視し、ジョブを 1 件ずつ順番に処理する
+/// Phase 3以降: SemaphoreSlim で同時実行数を制御した並列処理に変更する
 /// </summary>
 public class JobQueueWorker : BackgroundService
 {
     private readonly IJobQueue _jobQueue;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JobQueueWorker> _logger;
-
-    // TODO: appsettingsから注入（Phase 3）
-    private readonly int _maxConcurrentJobs = 2;
 
     public JobQueueWorker(
         IJobQueue jobQueue,
@@ -31,27 +28,43 @@ public class JobQueueWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // TODO: Phase 3で実装
-        // SemaphoreSlimで同時実行数を制限しながらジョブを処理する
-        //
-        // var semaphore = new SemaphoreSlim(_maxConcurrentJobs);
-        // while (!stoppingToken.IsCancellationRequested)
-        // {
-        //     var jobId = await _jobQueue.DequeueAsync(stoppingToken);
-        //     if (jobId is null) continue;
-        //
-        //     await semaphore.WaitAsync(stoppingToken);
-        //     _ = Task.Run(async () =>
-        //     {
-        //         try
-        //         {
-        //             using var scope = _scopeFactory.CreateScope();
-        //             var orchestrator = scope.ServiceProvider.GetRequiredService<JobOrchestrator>();
-        //             await orchestrator.ExecuteJobAsync(jobId.Value, stoppingToken);
-        //         }
-        //         finally { semaphore.Release(); }
-        //     }, stoppingToken);
-        // }
-        throw new NotImplementedException();
+        _logger.LogInformation("JobQueueWorker started.");
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            Guid? jobId;
+            try
+            {
+                jobId = await _jobQueue.DequeueAsync(stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            if (jobId is null) continue;
+
+            _logger.LogInformation("Dequeued job {JobId}.", jobId.Value);
+
+            try
+            {
+                // Scoped サービス（JobOrchestrator）をジョブ単位のスコープで解決する
+                using var scope = _scopeFactory.CreateScope();
+                var orchestrator = scope.ServiceProvider
+                    .GetRequiredService<JobOrchestrator>();
+
+                await orchestrator.ExecuteJobAsync(jobId.Value, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Job {JobId} processing was cancelled.", jobId.Value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Job {JobId} failed unexpectedly.", jobId.Value);
+            }
+        }
+
+        _logger.LogInformation("JobQueueWorker stopped.");
     }
 }

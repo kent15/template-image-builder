@@ -1,8 +1,11 @@
 using ImageBatchGenerator.Application.Interfaces;
+using ImageBatchGenerator.Application.Orchestration;
 using ImageBatchGenerator.Application.UseCases.Jobs;
 using ImageBatchGenerator.Domain.Interfaces;
+using ImageBatchGenerator.Infrastructure.Jobs;
 using ImageBatchGenerator.Infrastructure.Persistence.Repositories;
 using ImageBatchGenerator.Infrastructure.Queue;
+using ImageBatchGenerator.Web.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +17,7 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()));
 
 // ── リポジトリ（インメモリ実装） ─────────────────────────────
-// Phase 1: 以下インメモリ版を使用。Phase 2以降は EF Core 実装へ差し替え。
+// Phase 2以降は EF Core 実装へ差し替える
 // builder.Services.AddScoped<IJobRepository, JobRepository>();
 // builder.Services.AddScoped<IJobItemRepository, JobItemRepository>();
 builder.Services.AddSingleton<IJobRepository, InMemoryJobRepository>();
@@ -23,12 +26,21 @@ builder.Services.AddSingleton<IJobItemRepository, InMemoryJobItemRepository>();
 // ── キュー（インメモリ実装） ──────────────────────────────────
 builder.Services.AddSingleton<IJobQueue, InMemoryJobQueue>();
 
+// ── キャンセルレジストリ ──────────────────────────────────────
+builder.Services.AddSingleton<IJobCancellationRegistry, InMemoryJobCancellationRegistry>();
+
 // ── ユースケース ────────────────────────────────────────────
 builder.Services.AddScoped<CreateJobUseCase>();
 builder.Services.AddScoped<StartJobUseCase>();
 builder.Services.AddScoped<CancelJobUseCase>();
 builder.Services.AddScoped<RetryJobUseCase>();
 builder.Services.AddScoped<GetJobProgressUseCase>();
+
+// ── オーケストレーター（Scoped: ジョブ単位のスコープで解決される） ──
+builder.Services.AddScoped<JobOrchestrator>();
+
+// ── バックグラウンドワーカー ─────────────────────────────────
+builder.Services.AddHostedService<JobQueueWorker>();
 
 // ── ヘルスチェック ──────────────────────────────────────────
 builder.Services.AddHealthChecks();
@@ -48,7 +60,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 
 // TODO: Phase 5 — ExceptionHandlingMiddleware, RequestLoggingMiddleware
-// TODO: Phase 3 — SignalR hub, JobQueueWorker
+// TODO: Phase 3 — SignalR hub（ProgressHub）
 
 app.UseAuthorization();
 app.MapControllers();
