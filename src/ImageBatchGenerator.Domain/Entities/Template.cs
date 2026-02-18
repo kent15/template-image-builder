@@ -27,6 +27,33 @@ public class Template
 
     public IReadOnlyCollection<Job> Jobs { get; private set; } = new List<Job>();
 
+    private Template() { }
+
+    /// <summary>新しいテンプレートを作成する</summary>
+    public static Template Create(
+        string name,
+        string? description,
+        int width,
+        int height,
+        string layerConfigJson,
+        string filePath = "")
+    {
+        return new Template
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Description = description,
+            Width = width,
+            Height = height,
+            LayerConfigJson = layerConfigJson,
+            FilePath = filePath,
+            Version = 1,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+    }
+
     // TODO: ドメインロジック実装（Phase 2）
 
     /// <summary>テンプレートを新しいバージョンに更新する</summary>

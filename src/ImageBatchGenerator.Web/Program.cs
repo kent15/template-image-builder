@@ -2,6 +2,7 @@ using ImageBatchGenerator.Application.Interfaces;
 using ImageBatchGenerator.Application.Options;
 using ImageBatchGenerator.Application.Orchestration;
 using ImageBatchGenerator.Application.UseCases.Jobs;
+using ImageBatchGenerator.Application.UseCases.Templates;
 using ImageBatchGenerator.Domain.Interfaces;
 using ImageBatchGenerator.Infrastructure.ImageProcessing;
 using ImageBatchGenerator.Infrastructure.Jobs;
@@ -46,6 +47,7 @@ builder.Services.AddSingleton<IProgressNotifier, NullProgressNotifier>();
 builder.Services.AddScoped<IImageProcessor, ImageSharpProcessor>();
 
 // ── ユースケース ────────────────────────────────────────────
+builder.Services.AddScoped<RegisterTemplateUseCase>();
 builder.Services.AddScoped<CreateJobUseCase>();
 builder.Services.AddScoped<StartJobUseCase>();
 builder.Services.AddScoped<CancelJobUseCase>();

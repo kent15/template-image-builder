@@ -20,7 +20,15 @@ public record CreateJobRequest
 
     /// <summary>
     /// CSV行数（インメモリ管理ではCSVパース不要のため呼び出し元から指定）
+    /// InputRows が指定されている場合はそちらが優先される
     /// Phase 2以降は CSVパース結果で自動設定する
     /// </summary>
     public int TotalCount { get; init; } = 0;
+
+    /// <summary>
+    /// 入力データ行（レイヤーID → 値）のリスト
+    /// 指定された場合 TotalCount より優先し、各行が1件の JobItem になる
+    /// 例: [{"title":"商品A","subtitle":"¥1,000"},{"title":"商品B","subtitle":"¥2,000"}]
+    /// </summary>
+    public IReadOnlyList<Dictionary<string, string>>? InputRows { get; init; }
 }

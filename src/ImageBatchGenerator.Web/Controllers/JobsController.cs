@@ -13,6 +13,7 @@ namespace ImageBatchGenerator.Web.Controllers;
 public class JobsController : ControllerBase
 {
     private readonly IJobRepository _jobRepository;
+    private readonly IStorageService _storageService;
     private readonly CreateJobUseCase _createJobUseCase;
     private readonly StartJobUseCase _startJobUseCase;
     private readonly CancelJobUseCase _cancelJobUseCase;
@@ -21,6 +22,7 @@ public class JobsController : ControllerBase
 
     public JobsController(
         IJobRepository jobRepository,
+        IStorageService storageService,
         CreateJobUseCase createJobUseCase,
         StartJobUseCase startJobUseCase,
         CancelJobUseCase cancelJobUseCase,
@@ -28,6 +30,7 @@ public class JobsController : ControllerBase
         GetJobProgressUseCase getJobProgressUseCase)
     {
         _jobRepository = jobRepository;
+        _storageService = storageService;
         _createJobUseCase = createJobUseCase;
         _startJobUseCase = startJobUseCase;
         _cancelJobUseCase = cancelJobUseCase;
@@ -53,7 +56,11 @@ public class JobsController : ControllerBase
         return Ok(job.ToDto());
     }
 
-    /// <summary>ジョブを作成する（ウィザード完了時に呼ばれる）</summary>
+    /// <summary>
+    /// ジョブを作成する
+    /// InputRows を使うと実際の入力データでジョブを作成できる
+    /// 例: "inputRows": [{"title":"商品A","subtitle":"¥1,000"},{"title":"商品B","subtitle":"¥2,000"}]
+    /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateJobRequest request, CancellationToken ct)
     {
@@ -85,7 +92,7 @@ public class JobsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>ジョブの現在の進捗を取得する（ポーリングフォールバック用）</summary>
+    /// <summary>ジョブの現在の進捗を取得する（ポーリング用）</summary>
     [HttpGet("{id:guid}/progress")]
     public async Task<IActionResult> GetProgress(Guid id, CancellationToken ct)
     {
@@ -93,8 +100,14 @@ public class JobsController : ControllerBase
         return Ok(progress);
     }
 
-    /// <summary>生成画像を ZIP で一括ダウンロードする（Phase 4 で実装）</summary>
+    /// <summary>生成画像を ZIP で一括ダウンロードする</summary>
     [HttpGet("{id:guid}/download")]
-    public IActionResult Download(Guid id)
-        => StatusCode(501, new { message = "ダウンロード機能は Phase 4 で実装予定です。" });
+    public async Task<IActionResult> Download(Guid id, CancellationToken ct)
+    {
+        var job = await _jobRepository.GetByIdAsync(id, ct);
+        if (job is null) return NotFound();
+
+        var stream = await _storageService.CreateZipArchiveAsync(id, ct);
+        return File(stream, "application/zip", $"job_{id}.zip");
+    }
 }
