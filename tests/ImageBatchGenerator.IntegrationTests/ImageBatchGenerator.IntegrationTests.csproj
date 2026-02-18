@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ImageBatchGenerator.IntegrationTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ImageBatchGenerator.Web\ImageBatchGenerator.Web.csproj" />
+    <ProjectReference Include="..\..\src\ImageBatchGenerator.Infrastructure\ImageBatchGenerator.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- NuGetパッケージ（Phase 5で追加予定） -->
+  <ItemGroup>
+    <!-- TODO: dotnet add package xunit -->
+    <!-- TODO: dotnet add package xunit.runner.visualstudio -->
+    <!-- TODO: dotnet add package Microsoft.NET.Test.Sdk -->
+    <!-- TODO: dotnet add package Microsoft.AspNetCore.Mvc.Testing -->
+  </ItemGroup>
+
+</Project>

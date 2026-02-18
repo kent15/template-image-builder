@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ImageBatchGenerator.Application</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Application層はDomain層にのみ依存する -->
+  <ItemGroup>
+    <ProjectReference Include="..\ImageBatchGenerator.Domain\ImageBatchGenerator.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

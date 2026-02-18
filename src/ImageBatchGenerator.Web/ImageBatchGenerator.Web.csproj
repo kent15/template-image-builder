@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ImageBatchGenerator.Web</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Web層はApplication・Infrastructure層に依存する -->
+  <ItemGroup>
+    <ProjectReference Include="..\ImageBatchGenerator.Application\ImageBatchGenerator.Application.csproj" />
+    <ProjectReference Include="..\ImageBatchGenerator.Infrastructure\ImageBatchGenerator.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- NuGetパッケージ（Phase 1で追加予定） -->
+  <ItemGroup>
+    <!-- TODO: dotnet add package Serilog.AspNetCore -->
+    <!-- TODO: dotnet add package Microsoft.AspNetCore.SignalR（組込のため不要な場合あり） -->
+  </ItemGroup>
+
+</Project>

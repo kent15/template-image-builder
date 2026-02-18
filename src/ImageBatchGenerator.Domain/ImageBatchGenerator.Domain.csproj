@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ImageBatchGenerator.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Domain層は外部依存なし -->
+
+</Project>

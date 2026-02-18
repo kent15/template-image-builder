@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ImageBatchGenerator.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Infrastructure層はApplication・Domain層のインターフェースを実装する -->
+  <ItemGroup>
+    <ProjectReference Include="..\ImageBatchGenerator.Application\ImageBatchGenerator.Application.csproj" />
+  </ItemGroup>
+
+  <!-- NuGetパッケージ（Phase 1で追加予定） -->
+  <ItemGroup>
+    <!-- TODO: dotnet add package Microsoft.EntityFrameworkCore.SqlServer -->
+    <!-- TODO: dotnet add package Microsoft.EntityFrameworkCore.Tools -->
+    <!-- TODO: dotnet add package SkiaSharp -->
+    <!-- TODO: dotnet add package SkiaSharp.HarfBuzz -->
+    <!-- TODO: dotnet add package Serilog.AspNetCore -->
+    <!-- TODO: dotnet add package Serilog.Sinks.MSSqlServer -->
+    <!-- TODO: dotnet add package Microsoft.AspNetCore.SignalR.Client -->
+  </ItemGroup>
+
+</Project>
