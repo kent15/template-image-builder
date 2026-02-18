@@ -5,7 +5,7 @@ namespace ImageBatchGenerator.Application.UseCases.Jobs;
 
 /// <summary>
 /// ジョブ実行開始ユースケース
-/// ジョブをQueuedにしてキューに追加する
+/// ジョブを Queued 状態にしてインメモリキューに追加する
 /// </summary>
 public class StartJobUseCase
 {
@@ -23,12 +23,11 @@ public class StartJobUseCase
     /// </summary>
     public async Task ExecuteAsync(Guid jobId, CancellationToken ct = default)
     {
-        // TODO: Phase 3で実装
-        // 1. ジョブ取得・存在確認
-        // 2. StatusがCreatedであることを確認
-        // 3. Job.Enqueue()を呼び出してステータス変更
-        // 4. DBを更新
-        // 5. IJobQueueにjobIdを追加
-        throw new NotImplementedException();
+        var job = await _jobRepository.GetByIdAsync(jobId, ct)
+            ?? throw new InvalidOperationException($"Job not found: {jobId}");
+
+        job.Enqueue();
+        await _jobRepository.UpdateAsync(job, ct);
+        await _jobQueue.EnqueueAsync(jobId, ct);
     }
 }

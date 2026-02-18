@@ -38,47 +38,88 @@ public class Job
     public Template? Template { get; private set; }
     public IReadOnlyCollection<JobItem> Items { get; private set; } = new List<JobItem>();
 
-    // TODO: ドメインロジック実装（Phase 2〜3）
+    /// <summary>処理済み件数（成功 + 警告 + エラー + スキップ）</summary>
+    public int ProcessedCount => SuccessCount + WarningCount + ErrorCount + SkippedCount;
+
+    private Job() { }
+
+    /// <summary>ジョブを新規作成する</summary>
+    public static Job Create(
+        string name,
+        Guid templateId,
+        string mappingRulesJson,
+        string outputSettingsJson,
+        int totalCount = 0,
+        string? csvOriginalFileName = null,
+        string? csvStoragePath = null,
+        string? createdBy = null)
+    {
+        var job = new Job
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            TemplateId = templateId,
+            Status = JobStatus.Created,
+            MappingRulesJson = mappingRulesJson,
+            OutputSettingsJson = outputSettingsJson,
+            TotalCount = totalCount,
+            CsvOriginalFileName = csvOriginalFileName,
+            CsvStoragePath = csvStoragePath,
+            CreatedBy = createdBy,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        return job;
+    }
 
     /// <summary>ジョブをキューに追加する</summary>
     public void Enqueue()
     {
-        // TODO: Statusをキュー済みに変更し、QueuedAtを設定する
-        throw new NotImplementedException();
+        Status = JobStatus.Queued;
+        QueuedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>ジョブの実行を開始する</summary>
     public void Start()
     {
-        // TODO: Statusを実行中に変更し、StartedAtを設定する
-        throw new NotImplementedException();
+        Status = JobStatus.Running;
+        StartedAt = DateTimeOffset.UtcNow;
     }
 
-    /// <summary>ジョブを完了状態にする</summary>
+    /// <summary>ジョブを完了状態にする（エラー・警告があれば CompletedWithWarning）</summary>
     public void Complete()
     {
-        // TODO: 成功・警告・エラー件数に応じてStatusを決定し、CompletedAtを設定する
-        throw new NotImplementedException();
+        Status = (ErrorCount > 0 || WarningCount > 0)
+            ? JobStatus.CompletedWithWarning
+            : JobStatus.Completed;
+        CompletedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>ジョブをキャンセルする</summary>
     public void Cancel()
     {
-        // TODO: Statusをキャンセル済みに変更する
-        throw new NotImplementedException();
+        Status = JobStatus.Cancelled;
+        CompletedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>チェックポイントを更新する</summary>
     public void UpdateCheckpoint(int lastProcessedIndex)
     {
-        // TODO: LastProcessedIndexを更新する
-        throw new NotImplementedException();
+        LastProcessedIndex = lastProcessedIndex;
     }
 
     /// <summary>進捗カウンタを加算する</summary>
     public void IncrementProgress(bool success, bool warning, bool error)
     {
-        // TODO: SuccessCount / WarningCount / ErrorCountを加算する
-        throw new NotImplementedException();
+        if (success) SuccessCount++;
+        if (warning) WarningCount++;
+        if (error) ErrorCount++;
+    }
+
+    /// <summary>エラー再実行のためにカウンタをリセットして再キューする</summary>
+    public void ResetForRetry()
+    {
+        ErrorCount = 0;
+        RetryCount++;
+        Enqueue();
     }
 }

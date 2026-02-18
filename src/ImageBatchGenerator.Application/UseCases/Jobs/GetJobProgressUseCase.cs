@@ -5,7 +5,7 @@ namespace ImageBatchGenerator.Application.UseCases.Jobs;
 
 /// <summary>
 /// ジョブ進捗取得ユースケース
-/// ポーリングフォールバック用のREST APIエンドポイントから呼ばれる
+/// SignalR が使えない場合のポーリングフォールバック用
 /// </summary>
 public class GetJobProgressUseCase
 {
@@ -17,14 +17,43 @@ public class GetJobProgressUseCase
     }
 
     /// <summary>
-    /// ジョブの現在の進捗DTOを返す
+    /// ジョブの現在の進捗 DTO を返す
     /// </summary>
     public async Task<JobProgressDto> ExecuteAsync(Guid jobId, CancellationToken ct = default)
     {
-        // TODO: Phase 3で実装
-        // 1. ジョブ取得・存在確認
-        // 2. 進捗率・処理速度・推定残り時間を計算
-        // 3. JobProgressDtoに変換して返却
-        throw new NotImplementedException();
+        var job = await _jobRepository.GetByIdAsync(jobId, ct)
+            ?? throw new InvalidOperationException($"Job not found: {jobId}");
+
+        var processedCount = job.ProcessedCount;
+        var progressRate = job.TotalCount > 0
+            ? (double)processedCount / job.TotalCount
+            : 0.0;
+
+        double? itemsPerSecond = null;
+        double? estimatedRemainingSeconds = null;
+
+        if (job.StartedAt.HasValue && processedCount > 0)
+        {
+            var elapsedSeconds = (DateTimeOffset.UtcNow - job.StartedAt.Value).TotalSeconds;
+            if (elapsedSeconds > 0)
+            {
+                itemsPerSecond = processedCount / elapsedSeconds;
+                var remaining = job.TotalCount - processedCount;
+                estimatedRemainingSeconds = remaining / itemsPerSecond;
+            }
+        }
+
+        return new JobProgressDto
+        {
+            JobId = job.Id,
+            ProcessedCount = processedCount,
+            TotalCount = job.TotalCount,
+            SuccessCount = job.SuccessCount,
+            WarningCount = job.WarningCount,
+            ErrorCount = job.ErrorCount,
+            ProgressRate = progressRate,
+            ItemsPerSecond = itemsPerSecond,
+            EstimatedRemainingSeconds = estimatedRemainingSeconds,
+        };
     }
 }

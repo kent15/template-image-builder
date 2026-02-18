@@ -6,7 +6,7 @@ namespace ImageBatchGenerator.Application.UseCases.Jobs;
 
 /// <summary>
 /// ジョブ再実行ユースケース
-/// エラー状態のJobItemのみをPendingに戻してキューに再投入する
+/// エラー状態の JobItem のみを Pending に戻してキューに再投入する
 /// </summary>
 public class RetryJobUseCase
 {
@@ -25,17 +25,23 @@ public class RetryJobUseCase
     }
 
     /// <summary>
-    /// エラー分のみ再実行する
+    /// エラー分のみ Pending に戻してキューに再投入する
     /// </summary>
     public async Task ExecuteAsync(Guid jobId, CancellationToken ct = default)
     {
-        // TODO: Phase 3で実装
-        // 1. ジョブ取得・存在確認
-        // 2. StatusがFailed/CompletedWithWarningであることを確認
-        // 3. Status = Error のJobItemをすべてPendingに戻す
-        // 4. Job.StatusをRunning相当に変更・ErrorCountをリセット
-        // 5. DBを更新
-        // 6. IJobQueueにjobIdを追加
-        throw new NotImplementedException();
+        var job = await _jobRepository.GetByIdAsync(jobId, ct)
+            ?? throw new InvalidOperationException($"Job not found: {jobId}");
+
+        var errorItems = await _jobItemRepository
+            .GetByJobIdAndStatusAsync(jobId, JobItemStatus.Error, ct);
+
+        foreach (var item in errorItems)
+            item.ResetForRetry();
+
+        await _jobItemRepository.UpdateRangeAsync(errorItems, ct);
+
+        job.ResetForRetry(); // ErrorCount リセット + Enqueue()
+        await _jobRepository.UpdateAsync(job, ct);
+        await _jobQueue.EnqueueAsync(jobId, ct);
     }
 }

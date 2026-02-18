@@ -13,24 +13,20 @@ public class InMemoryJobQueue : IJobQueue
     private readonly Channel<Guid> _channel = Channel.CreateBounded<Guid>(capacity: 100);
 
     public async Task EnqueueAsync(Guid jobId, CancellationToken ct = default)
-    {
-        // TODO: Phase 3で実装
-        // await _channel.Writer.WriteAsync(jobId, ct);
-        throw new NotImplementedException();
-    }
+        => await _channel.Writer.WriteAsync(jobId, ct);
 
     public async Task<Guid?> DequeueAsync(CancellationToken ct = default)
     {
-        // TODO: Phase 3で実装
-        // try { return await _channel.Reader.ReadAsync(ct); }
-        // catch (OperationCanceledException) { return null; }
-        throw new NotImplementedException();
+        try
+        {
+            return await _channel.Reader.ReadAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
     }
 
-    public async Task<int> GetQueueLengthAsync()
-    {
-        // TODO: Phase 3で実装
-        // return _channel.Reader.Count;
-        throw new NotImplementedException();
-    }
+    public Task<int> GetQueueLengthAsync()
+        => Task.FromResult(_channel.Reader.Count);
 }

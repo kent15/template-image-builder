@@ -11,14 +11,14 @@ public record JobDto
     public string TemplateName { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public int TotalCount { get; init; }
+    public int ProcessedCount { get; init; }
     public int SuccessCount { get; init; }
     public int WarningCount { get; init; }
     public int ErrorCount { get; init; }
     public int SkippedCount { get; init; }
     public string? CsvOriginalFileName { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? QueuedAt { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
-
-    // TODO: マッピング実装（Phase 2）
 }

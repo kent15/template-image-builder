@@ -18,5 +18,9 @@ public record CreateJobRequest
     public string? CsvStoragePath { get; init; }
     public string? CreatedBy { get; init; }
 
-    // TODO: バリデーションロジック実装（Phase 2）
+    /// <summary>
+    /// CSV行数（インメモリ管理ではCSVパース不要のため呼び出し元から指定）
+    /// Phase 2以降は CSVパース結果で自動設定する
+    /// </summary>
+    public int TotalCount { get; init; } = 0;
 }

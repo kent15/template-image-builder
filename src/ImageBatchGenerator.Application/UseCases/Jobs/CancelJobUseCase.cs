@@ -4,7 +4,8 @@ namespace ImageBatchGenerator.Application.UseCases.Jobs;
 
 /// <summary>
 /// ジョブキャンセルユースケース
-/// 実行中ジョブにCancellationTokenを通知して停止する
+/// インメモリ実装: ステータスを Cancelled に更新する
+/// Phase 3以降: CancellationTokenRegistry で実行中ワーカーを停止する
 /// </summary>
 public class CancelJobUseCase
 {
@@ -16,16 +17,14 @@ public class CancelJobUseCase
     }
 
     /// <summary>
-    /// 実行中ジョブをキャンセルする
+    /// ジョブをキャンセルする
     /// </summary>
     public async Task ExecuteAsync(Guid jobId, CancellationToken ct = default)
     {
-        // TODO: Phase 3で実装
-        // 1. ジョブ取得・存在確認
-        // 2. StatusがRunning/Queuedであることを確認
-        // 3. CancellationTokenRegistryでCTSをキャンセル
-        // 4. Job.Cancel()を呼び出してステータス変更
-        // 5. DBを更新
-        throw new NotImplementedException();
+        var job = await _jobRepository.GetByIdAsync(jobId, ct)
+            ?? throw new InvalidOperationException($"Job not found: {jobId}");
+
+        job.Cancel();
+        await _jobRepository.UpdateAsync(job, ct);
     }
 }

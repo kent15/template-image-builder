@@ -28,40 +28,56 @@ public class JobItem
     public Job? Job { get; private set; }
     public GeneratedImage? GeneratedImage { get; private set; }
 
-    // TODO: ドメインロジック実装（Phase 3）
+    private JobItem() { }
+
+    /// <summary>ジョブ明細を新規作成する</summary>
+    public static JobItem Create(Guid jobId, int rowIndex, string? inputDataJson = null)
+    {
+        return new JobItem
+        {
+            Id = Guid.NewGuid(),
+            JobId = jobId,
+            RowIndex = rowIndex,
+            Status = JobItemStatus.Pending,
+            InputDataJson = inputDataJson,
+        };
+    }
 
     /// <summary>処理を開始する</summary>
     public void MarkRunning()
     {
-        // TODO: Statusを実行中に変更する
-        throw new NotImplementedException();
+        Status = JobItemStatus.Running;
     }
 
     /// <summary>成功完了にする</summary>
     public void MarkSuccess(int processingMs)
     {
-        // TODO: Statusを成功に変更し、ProcessedAt・ProcessingMsを設定する
-        throw new NotImplementedException();
+        Status = JobItemStatus.Success;
+        ProcessedAt = DateTimeOffset.UtcNow;
+        ProcessingMs = processingMs;
     }
 
     /// <summary>警告付き完了にする</summary>
     public void MarkWarning(string warningMessage, int processingMs)
     {
-        // TODO: Statusを警告に変更し、WarningMessageを設定する
-        throw new NotImplementedException();
+        Status = JobItemStatus.Warning;
+        WarningMessage = warningMessage;
+        ProcessedAt = DateTimeOffset.UtcNow;
+        ProcessingMs = processingMs;
     }
 
     /// <summary>エラー状態にする</summary>
     public void MarkError(string errorMessage)
     {
-        // TODO: Statusをエラーに変更し、RetryCountを加算する
-        throw new NotImplementedException();
+        Status = JobItemStatus.Error;
+        WarningMessage = errorMessage;
+        RetryCount++;
     }
 
     /// <summary>エラー再実行のためにPendingに戻す</summary>
     public void ResetForRetry()
     {
-        // TODO: StatusをPendingに戻す
-        throw new NotImplementedException();
+        Status = JobItemStatus.Pending;
+        WarningMessage = null;
     }
 }
