@@ -27,6 +27,7 @@ public class AssetsController : ControllerBase
 
     /// <summary>素材を単体アップロードする</summary>
     [HttpPost]
+    [Consumes("multipart/form-data")]
     public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm] string category, CancellationToken ct)
     {
         // TODO: Phase 2で実装
@@ -36,6 +37,7 @@ public class AssetsController : ControllerBase
 
     /// <summary>ZIPファイルから素材を一括アップロードする</summary>
     [HttpPost("batch")]
+    [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadBatch([FromForm] IFormFile zipFile, [FromForm] string category, CancellationToken ct)
     {
         // TODO: Phase 2で実装
