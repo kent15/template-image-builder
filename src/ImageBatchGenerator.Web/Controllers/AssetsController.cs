@@ -1,4 +1,5 @@
 using ImageBatchGenerator.Application.UseCases.Assets;
+using ImageBatchGenerator.Web.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ImageBatchGenerator.Web.Controllers;
@@ -28,7 +29,7 @@ public class AssetsController : ControllerBase
     /// <summary>素材を単体アップロードする</summary>
     [HttpPost]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm] string category, CancellationToken ct)
+    public async Task<IActionResult> Upload([FromForm] UploadAssetRequest request, CancellationToken ct)
     {
         // TODO: Phase 2で実装
         // MIMEタイプ・ファイルサイズバリデーション（最大50MB）
@@ -38,7 +39,7 @@ public class AssetsController : ControllerBase
     /// <summary>ZIPファイルから素材を一括アップロードする</summary>
     [HttpPost("batch")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadBatch([FromForm] IFormFile zipFile, [FromForm] string category, CancellationToken ct)
+    public async Task<IActionResult> UploadBatch([FromForm] UploadBatchAssetRequest request, CancellationToken ct)
     {
         // TODO: Phase 2で実装
         throw new NotImplementedException();
