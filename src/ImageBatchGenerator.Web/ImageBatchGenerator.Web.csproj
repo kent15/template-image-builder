@@ -18,5 +18,8 @@
     <!-- TODO: dotnet add package Serilog.AspNetCore -->
     <!-- TODO: dotnet add package Microsoft.AspNetCore.SignalR（組込のため不要な場合あり） -->
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+  </ItemGroup>
 
 </Project>

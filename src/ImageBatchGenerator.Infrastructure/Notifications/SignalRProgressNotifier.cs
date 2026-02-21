@@ -12,9 +12,9 @@ public class SignalRProgressNotifier : IProgressNotifier
 {
     // TODO: Phase 3でIHubContext<ProgressHub>を注入
     // ProgressHubはWeb層に存在するため、循環参照を避けるためIHubContext<IProgressHubClient>等で注入する
-    private readonly IHubContext<object> _hubContext;
+    private readonly IHubContext<ProgressHubPlaceholder> _hubContext;
 
-    public SignalRProgressNotifier(IHubContext<object> hubContext)
+    public SignalRProgressNotifier(IHubContext<ProgressHubPlaceholder> hubContext)
     {
         _hubContext = hubContext;
     }
@@ -46,3 +46,6 @@ public class SignalRProgressNotifier : IProgressNotifier
         throw new NotImplementedException();
     }
 }
+
+/// <summary>Phase 3 で実際の ProgressHub に差し替える仮クラス</summary>
+public class ProgressHubPlaceholder : Hub { }

@@ -7,6 +7,11 @@
     <RootNamespace>ImageBatchGenerator.Infrastructure</RootNamespace>
   </PropertyGroup>
 
+  <!-- SignalR の IHubContext 等を使うため ASP.NET Core 参照が必要 -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <!-- Infrastructure層はApplication・Domain層のインターフェースを実装する -->
   <ItemGroup>
     <ProjectReference Include="..\ImageBatchGenerator.Application\ImageBatchGenerator.Application.csproj" />
@@ -14,6 +19,9 @@
 
   <!-- 画像処理: SixLabors.ImageSharp（Apache-2.0） -->
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.*" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
   </ItemGroup>
