@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using ImageBatchGenerator.Domain.Entities;
 using ImageBatchGenerator.Domain.Interfaces;
 
 namespace ImageBatchGenerator.Application.UseCases.Assets;
@@ -8,6 +10,13 @@ namespace ImageBatchGenerator.Application.UseCases.Assets;
 /// </summary>
 public class UploadAssetUseCase
 {
+    private const long MaxFileSizeBytes = 50L * 1024 * 1024; // 50MB
+
+    private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/png", "image/jpeg", "image/webp", "image/gif",
+    };
+
     private readonly IAssetRepository _assetRepository;
     private readonly IStorageService _storageService;
 
@@ -28,12 +37,25 @@ public class UploadAssetUseCase
         string category,
         CancellationToken ct = default)
     {
-        // TODO: Phase 2で実装
-        // 1. MIMEタイプ・拡張子・ファイルサイズバリデーション（最大50MB）
-        // 2. ストレージに保存
-        // 3. Assetエンティティ作成・DB保存
-        // 4. AssetのIdを返却
-        throw new NotImplementedException();
+        if (!AllowedContentTypes.Contains(contentType))
+            throw new InvalidOperationException($"サポートされていないファイル形式です: {contentType}");
+
+        if (fileStream.CanSeek && fileStream.Length > MaxFileSizeBytes)
+            throw new InvalidOperationException("ファイルサイズが上限（50MB）を超えています。");
+
+        var fileSizeBytes = fileStream.CanSeek ? fileStream.Length : 0L;
+        var storagePath = await _storageService.SaveAsync(fileStream, fileName, $"assets/{category}", ct);
+
+        var asset = Asset.Create(
+            name: Path.GetFileNameWithoutExtension(fileName),
+            storagePath: storagePath,
+            fileName: fileName,
+            contentType: contentType,
+            fileSizeBytes: fileSizeBytes,
+            category: category);
+
+        await _assetRepository.AddAsync(asset, ct);
+        return asset.Id;
     }
 
     /// <summary>
@@ -45,12 +67,47 @@ public class UploadAssetUseCase
         string category,
         CancellationToken ct = default)
     {
-        // TODO: Phase 2で実装
-        // 1. ZIPファイルを展開
-        // 2. 各エントリについてMIMEタイプバリデーション
-        // 3. ストレージに一括保存
-        // 4. Assetエンティティ一括作成・DB保存
-        // 5. AssetのIdリストを返却
-        throw new NotImplementedException();
+        var assets = new List<Asset>();
+
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
+
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Name)) continue; // ディレクトリエントリをスキップ
+            if (entry.Length > MaxFileSizeBytes) continue;       // サイズ超過はスキップ
+
+            var contentType = GetContentTypeFromExtension(Path.GetExtension(entry.Name));
+            if (contentType is null) continue; // 非対応形式はスキップ
+
+            await using var entryStream = entry.Open();
+            var ms = new MemoryStream();
+            await entryStream.CopyToAsync(ms, ct);
+            ms.Position = 0;
+
+            var storagePath = await _storageService.SaveAsync(ms, entry.Name, $"assets/{category}", ct);
+
+            var asset = Asset.Create(
+                name: Path.GetFileNameWithoutExtension(entry.Name),
+                storagePath: storagePath,
+                fileName: entry.Name,
+                contentType: contentType,
+                fileSizeBytes: entry.Length,
+                category: category);
+
+            assets.Add(asset);
+        }
+
+        await _assetRepository.AddRangeAsync(assets, ct);
+        return assets.Select(a => a.Id).ToList();
     }
+
+    private static string? GetContentTypeFromExtension(string extension) =>
+        extension.ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => null,
+        };
 }

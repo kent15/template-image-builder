@@ -17,12 +17,17 @@ public record MappingRule
     /// <summary>固定素材ID（背景・固定画像の場合）</summary>
     public Guid? AssetId { get; init; }
 
-    // TODO: バリデーションロジック実装（Phase 2）
-
     /// <summary>マッピングルールが有効かどうかを検証する</summary>
     public bool IsValid()
     {
-        // TODO: LayerTypeに応じてCsvColumnNameまたはAssetIdが設定されているか検証する
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(LayerId)) return false;
+
+        return LayerType switch
+        {
+            "Text" => !string.IsNullOrWhiteSpace(CsvColumnName),
+            "ProductImage" => !string.IsNullOrWhiteSpace(CsvColumnName) || AssetId.HasValue,
+            "Background" => AssetId.HasValue,
+            _ => false,
+        };
     }
 }

@@ -1,12 +1,11 @@
 using System.Net;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 
 namespace ImageBatchGenerator.Web.Middleware;
 
 /// <summary>
 /// グローバル例外ハンドリングミドルウェア
-/// 未処理例外をキャッチして適切なHTTPレスポンスに変換しSerilogに記録する
+/// 未処理例外をキャッチして適切なHTTPレスポンスに変換し記録する
 /// </summary>
 public class ExceptionHandlingMiddleware
 {
@@ -21,26 +20,38 @@ public class ExceptionHandlingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // TODO: Phase 5で実装
-        // try
-        // {
-        //     await _next(context);
-        // }
-        // catch (Exception ex)
-        // {
-        //     _logger.LogError(ex, "Unhandled exception occurred");
-        //     await HandleExceptionAsync(context, ex);
-        // }
-        await _next(context);
+        try
+        {
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception occurred while processing {Method} {Path}",
+                context.Request.Method, context.Request.Path);
+            await HandleExceptionAsync(context, ex);
+        }
     }
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        // TODO: Phase 5で実装
-        // 例外種別に応じてHTTPステータスコードを決定する
-        // - NotFoundException → 404
-        // - ValidationException → 400
-        // - その他 → 500
-        throw new NotImplementedException();
+        var (statusCode, message) = exception switch
+        {
+            InvalidOperationException => (HttpStatusCode.BadRequest, exception.Message),
+            KeyNotFoundException => (HttpStatusCode.NotFound, exception.Message),
+            NotImplementedException => (HttpStatusCode.NotImplemented, "この機能は未実装です。"),
+            OperationCanceledException => (HttpStatusCode.BadRequest, "リクエストがキャンセルされました。"),
+            _ => (HttpStatusCode.InternalServerError, "サーバー内部でエラーが発生しました。"),
+        };
+
+        context.Response.StatusCode = (int)statusCode;
+        context.Response.ContentType = "application/json";
+
+        var body = JsonSerializer.Serialize(new
+        {
+            error = message,
+            statusCode = (int)statusCode,
+        });
+
+        await context.Response.WriteAsync(body);
     }
 }

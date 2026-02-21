@@ -1,6 +1,7 @@
 using ImageBatchGenerator.Application.Interfaces;
 using ImageBatchGenerator.Application.Options;
 using ImageBatchGenerator.Application.Orchestration;
+using ImageBatchGenerator.Application.UseCases.Assets;
 using ImageBatchGenerator.Application.UseCases.Jobs;
 using ImageBatchGenerator.Application.UseCases.Templates;
 using ImageBatchGenerator.Domain.Interfaces;
@@ -11,6 +12,7 @@ using ImageBatchGenerator.Infrastructure.Persistence.Repositories;
 using ImageBatchGenerator.Infrastructure.Queue;
 using ImageBatchGenerator.Infrastructure.Storage;
 using ImageBatchGenerator.Web.BackgroundServices;
+using ImageBatchGenerator.Web.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +32,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<IJobRepository, InMemoryJobRepository>();
 builder.Services.AddSingleton<IJobItemRepository, InMemoryJobItemRepository>();
 builder.Services.AddSingleton<ITemplateRepository, InMemoryTemplateRepository>();
+builder.Services.AddSingleton<IAssetRepository, InMemoryAssetRepository>();
 
 // ── キュー（インメモリ実装） ──────────────────────────────────
 builder.Services.AddSingleton<IJobQueue, InMemoryJobQueue>();
@@ -48,6 +51,7 @@ builder.Services.AddScoped<IImageProcessor, ImageSharpProcessor>();
 
 // ── ユースケース ────────────────────────────────────────────
 builder.Services.AddScoped<RegisterTemplateUseCase>();
+builder.Services.AddScoped<UploadAssetUseCase>();
 builder.Services.AddScoped<CreateJobUseCase>();
 builder.Services.AddScoped<StartJobUseCase>();
 builder.Services.AddScoped<CancelJobUseCase>();
@@ -78,9 +82,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 app.UseCors();
 
-// TODO: Phase 5 — ExceptionHandlingMiddleware, RequestLoggingMiddleware
 // TODO: Phase 3 — SignalR hub（ProgressHub）
 
 app.UseAuthorization();

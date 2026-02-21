@@ -54,26 +54,27 @@ public class Template
         };
     }
 
-    // TODO: ドメインロジック実装（Phase 2）
-
     /// <summary>テンプレートを新しいバージョンに更新する</summary>
     public void UpdateVersion(string layerConfigJson, string filePath)
     {
-        // TODO: Versionをインクリメントし、LayerConfigJson・FilePathを更新する
-        throw new NotImplementedException();
+        LayerConfigJson = layerConfigJson;
+        FilePath = filePath;
+        Version++;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>テンプレートを論理削除する</summary>
     public void SoftDelete()
     {
-        // TODO: DeletedAtを設定し、IsActiveをfalseにする
-        throw new NotImplementedException();
+        IsActive = false;
+        DeletedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>サムネイルパスを設定する</summary>
     public void SetThumbnail(string thumbnailPath)
     {
-        // TODO: ThumbnailPathを更新する
-        throw new NotImplementedException();
+        ThumbnailPath = thumbnailPath;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

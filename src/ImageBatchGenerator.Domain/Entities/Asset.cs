@@ -28,12 +28,37 @@ public class Asset
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
 
-    // TODO: ドメインロジック実装（Phase 2）
+    private Asset() { }
+
+    /// <summary>新しい素材を作成する</summary>
+    public static Asset Create(
+        string name,
+        string storagePath,
+        string fileName,
+        string contentType,
+        long fileSizeBytes,
+        string category,
+        string? description = null)
+    {
+        return new Asset
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Description = description,
+            StoragePath = storagePath,
+            FileName = fileName,
+            ContentType = contentType,
+            FileSizeBytes = fileSizeBytes,
+            Category = category,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+    }
 
     /// <summary>素材を論理削除する</summary>
     public void SoftDelete()
     {
-        // TODO: DeletedAtを設定し、IsActiveをfalseにする
-        throw new NotImplementedException();
+        IsActive = false;
+        DeletedAt = DateTimeOffset.UtcNow;
     }
 }
