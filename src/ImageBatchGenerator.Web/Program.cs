@@ -3,6 +3,7 @@ using ImageBatchGenerator.Application.Options;
 using ImageBatchGenerator.Application.Orchestration;
 using ImageBatchGenerator.Application.UseCases.Assets;
 using ImageBatchGenerator.Application.UseCases.Jobs;
+using ImageBatchGenerator.Application.UseCases.PromptGeneration;
 using ImageBatchGenerator.Application.UseCases.Templates;
 using ImageBatchGenerator.Domain.Interfaces;
 using ImageBatchGenerator.Infrastructure.ImageProcessing;
@@ -49,6 +50,9 @@ builder.Services.AddSingleton<IProgressNotifier, NullProgressNotifier>();
 // ── 画像処理（ImageSharp） ──────────────────────────────────
 builder.Services.AddScoped<IImageProcessor, ImageSharpProcessor>();
 
+// ── プロンプト画像生成（スタブ実装 / AI API接続時は差し替え） ──
+builder.Services.AddScoped<IPromptImageGenerator, StubPromptImageGenerator>();
+
 // ── ユースケース ────────────────────────────────────────────
 builder.Services.AddScoped<RegisterTemplateUseCase>();
 builder.Services.AddScoped<UploadAssetUseCase>();
@@ -57,6 +61,7 @@ builder.Services.AddScoped<StartJobUseCase>();
 builder.Services.AddScoped<CancelJobUseCase>();
 builder.Services.AddScoped<RetryJobUseCase>();
 builder.Services.AddScoped<GetJobProgressUseCase>();
+builder.Services.AddScoped<GenerateFromPromptUseCase>();
 
 // ── バッチ処理コーディネーター ────────────────────────────────
 builder.Services.AddScoped<BatchCoordinator>();

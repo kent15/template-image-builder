@@ -39,10 +39,22 @@ function app() {
     showAssetModal: false,
     assetUploadCategory: 'ProductImage',
 
+    // Prompt generation state
+    promptText: '',
+    promptAssetId: null,
+    promptAssetName: null,
+    promptWidth: 800,
+    promptHeight: 600,
+    promptFormat: 'png',
+    promptResultUrl: null,
+    promptGenerating: false,
+    promptShowAssetPicker: false,
+
     sidebarItems: [
       { id: 'dashboard', label: 'ダッシュボード', icon: '📊', section: null },
       { id: 'templates', label: 'テンプレート管理', icon: '📐', section: '素材管理' },
       { id: 'assets', label: '素材ライブラリ', icon: '🖼', section: null },
+      { id: 'prompt-gen', label: 'プロンプト生成', icon: '✨', section: null },
       { id: 'wizard', label: '新規ジョブ作成', icon: '➕', section: 'ジョブ管理' },
       { id: 'jobs', label: 'ジョブ一覧', icon: '📋', section: null },
       { id: 'logs', label: 'ログビューア', icon: '📄', section: 'システム' },
@@ -76,6 +88,65 @@ function app() {
         this.wizardCsvRows = [];
         this.wizardMapping = [];
       }
+      if (p === 'prompt-gen') {
+        this.promptResultUrl = null;
+        this.promptShowAssetPicker = false;
+      }
+    },
+
+    // ── API: Prompt Generation ──
+    selectPromptAsset(asset) {
+      this.promptAssetId = asset.id;
+      this.promptAssetName = asset.fileName || asset.name;
+      this.promptShowAssetPicker = false;
+    },
+    clearPromptAsset() {
+      this.promptAssetId = null;
+      this.promptAssetName = null;
+    },
+    async generateFromPrompt() {
+      if (!this.promptText.trim()) {
+        this.showToast('プロンプトを入力してください', 'error');
+        return;
+      }
+      this.promptGenerating = true;
+      this.promptResultUrl = null;
+      try {
+        const payload = {
+          prompt: this.promptText.trim(),
+          referenceAssetId: this.promptAssetId || null,
+          width: this.promptWidth,
+          height: this.promptHeight,
+          format: this.promptFormat,
+          quality: 90,
+        };
+        const r = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          this.showToast(e.error || '生成に失敗しました', 'error');
+          return;
+        }
+        const blob = await r.blob();
+        if (this.promptResultUrl) URL.revokeObjectURL(this.promptResultUrl);
+        this.promptResultUrl = URL.createObjectURL(blob);
+        this.showToast('画像を生成しました');
+      } catch (e) {
+        this.showToast('通信エラーが発生しました', 'error');
+        console.error('generateFromPrompt', e);
+      } finally {
+        this.promptGenerating = false;
+      }
+    },
+    downloadPromptResult() {
+      if (!this.promptResultUrl) return;
+      const a = document.createElement('a');
+      a.href = this.promptResultUrl;
+      a.download = `prompt_${Date.now()}.${this.promptFormat}`;
+      a.click();
     },
     goToJobDetail(jobId) {
       this.selectedJobId = jobId;
