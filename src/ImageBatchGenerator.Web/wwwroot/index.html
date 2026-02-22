@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ImageBatch Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="/js/app.js"></script>
+  <style>
+    [x-cloak]{display:none!important}
+    @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+    .progress-shimmer{position:relative;overflow:hidden}
+    .progress-shimmer::after{content:'';position:absolute;top:0;left:0;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);animation:shimmer 1.5s infinite}
+    .drop-zone{border:2px dashed #cbd5e1;transition:all .2s}.drop-zone:hover{border-color:#6366f1;background:#eef2ff}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased" x-data="app()" x-cloak>
+
+<!-- Toast -->
+<div x-show="toast.show" x-transition class="fixed top-4 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-sm font-medium" :class="toast.type==='error'?'bg-red-600 text-white':'bg-green-600 text-white'" x-text="toast.message"></div>
+
+<!-- Loading overlay -->
+<div x-show="loading" class="fixed inset-0 bg-black/20 z-40 flex items-center justify-center"><div class="bg-white rounded-xl px-6 py-4 shadow-lg text-sm">処理中...</div></div>
+
+<div class="flex h-screen overflow-hidden">
+
+<!-- SIDEBAR -->
+<aside class="w-60 bg-slate-900 flex flex-col shrink-0">
+  <div class="px-4 py-5 border-b border-slate-700/50">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <div><p class="text-white font-bold text-sm">ImageBatch</p><p class="text-slate-400 text-xs">Generator v0.1</p></div>
+    </div>
+  </div>
+  <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <template x-for="item in sidebarItems" :key="item.id">
+      <div>
+        <p x-show="item.section" x-text="item.section" class="px-3 pt-4 pb-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider"></p>
+        <button @click="navigate(item.id)" :class="page===item.id||( page==='job-detail'&&item.id==='jobs') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <span x-text="item.icon" class="text-base w-5 text-center"></span>
+          <span x-text="item.label"></span>
+          <span x-show="item.id==='jobs'&&runningCount>0" x-text="runningCount" class="ml-auto bg-blue-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"></span>
+        </button>
+      </div>
+    </template>
+  </nav>
+</aside>
+
+<!-- MAIN -->
+<main class="flex-1 overflow-y-auto">
+
+<!-- ===== SCR-001 DASHBOARD ===== -->
+<div x-show="page==='dashboard'">
+  <div class="bg-white border-b px-6 py-4"><h1 class="text-xl font-bold">ダッシュボード</h1><p class="text-sm text-slate-500 mt-0.5">ジョブ全体の状態サマリー</p></div>
+  <div class="p-6 space-y-6">
+    <div class="grid grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl p-5 shadow-sm border"><div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-500">実行中</p><span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 text-sm">▶</span></div><p class="text-3xl font-bold mt-2" x-text="runningCount"></p></div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border"><div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-500">完了</p><span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600 text-sm">✓</span></div><p class="text-3xl font-bold mt-2" x-text="completedCount"></p></div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border"><div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-500">エラー</p><span class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center text-red-600 text-sm">✕</span></div><p class="text-3xl font-bold mt-2" x-text="failedCount"></p></div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border"><div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-500">総生成数</p><span class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 text-sm">■</span></div><p class="text-3xl font-bold mt-2" x-text="totalGenerated.toLocaleString()"></p></div>
+    </div>
+    <div class="grid grid-cols-3 gap-6">
+      <div class="col-span-2 bg-white rounded-xl shadow-sm border">
+        <div class="px-5 py-4 border-b"><h2 class="font-semibold text-slate-700">直近ジョブ</h2></div>
+        <div class="divide-y divide-slate-100">
+          <template x-for="job in jobs.slice(0,5)" :key="job.id">
+            <div class="px-5 py-3 flex items-center gap-4 hover:bg-slate-50 cursor-pointer" @click="goToJobDetail(job.id)">
+              <span class="w-2 h-2 rounded-full shrink-0" :class="{'bg-blue-500 animate-pulse':job.status==='Running','bg-green-500':job.status==='Completed','bg-red-500':job.status==='Failed','bg-slate-400':job.status==='Cancelled'}"></span>
+              <div class="flex-1 min-w-0"><p class="text-sm font-medium truncate" x-text="shortId(job.id)+' '+job.name"></p><p class="text-xs text-slate-400" x-text="job.templateName||'-'"></p></div>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="statusClass(job.status)" x-text="statusLabel(job.status)"></span>
+              <span x-show="job.status==='Running'" class="text-xs text-blue-600 font-semibold" x-text="progressPercent(job)+'%'"></span>
+            </div>
+          </template>
+          <div x-show="jobs.length===0" class="px-5 py-8 text-center text-sm text-slate-400">ジョブがまだありません</div>
+        </div>
+        <div class="px-5 py-3 border-t"><button @click="navigate('jobs')" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">すべてのジョブを見る →</button></div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border">
+        <div class="px-5 py-4 border-b"><h2 class="font-semibold text-slate-700">クイックアクション</h2></div>
+        <div class="p-5 space-y-3">
+          <button @click="navigate('wizard')" class="w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 justify-center">＋ 新規ジョブ作成</button>
+          <button @click="showTemplateModal=true" class="w-full bg-white border border-slate-300 text-slate-700 rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-slate-50">テンプレート追加</button>
+          <button @click="showAssetModal=true" class="w-full bg-white border border-slate-300 text-slate-700 rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-slate-50">素材アップロード</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-002 TEMPLATES ===== -->
+<div x-show="page==='templates'">
+  <div class="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div><h1 class="text-xl font-bold">テンプレート管理</h1><p class="text-sm text-slate-500 mt-0.5">SVG/JSONテンプレートの登録・管理</p></div>
+    <button @click="showTemplateModal=true" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700">＋ テンプレート追加</button>
+  </div>
+  <div class="p-6">
+    <div class="grid grid-cols-3 gap-5">
+      <template x-for="t in templates" :key="t.id">
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow group">
+          <div class="h-40 flex items-center justify-center" :style="'background:linear-gradient(135deg,'+tplColor(t)+'22,'+tplColor(t)+'44)'">
+            <div class="text-center">
+              <div class="w-16 h-12 rounded border-2 border-dashed mx-auto mb-2 flex items-center justify-center" :style="'border-color:'+tplColor(t)"><span class="text-xs" :style="'color:'+tplColor(t)">SVG</span></div>
+              <p class="text-xs font-medium" :style="'color:'+tplColor(t)" x-text="t.width+'x'+t.height+'px'"></p>
+            </div>
+          </div>
+          <div class="p-4">
+            <h3 class="font-semibold text-sm" x-text="t.name"></h3>
+            <p class="text-xs text-slate-400 mt-1" x-text="t.description||''"></p>
+            <div class="flex items-center gap-3 mt-2 text-xs text-slate-400">
+              <span x-text="t.width+'x'+t.height"></span>
+              <span x-text="formatDate(t.createdAt)"></span>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button @click="navigate('wizard');selectedTemplate=t.id" class="flex-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-md py-1.5">ジョブ作成</button>
+              <button @click="deleteTemplate(t.id)" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded-md py-1.5 px-3">削除</button>
+            </div>
+          </div>
+        </div>
+      </template>
+      <div @click="showTemplateModal=true" class="bg-white rounded-xl shadow-sm border-2 border-dashed border-slate-300 flex flex-col items-center justify-center h-64 hover:border-indigo-400 hover:bg-indigo-50/30 cursor-pointer group">
+        <span class="text-3xl text-slate-300 group-hover:text-indigo-400">＋</span>
+        <p class="text-sm text-slate-400 mt-2 group-hover:text-indigo-500">新規追加</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-003 ASSETS ===== -->
+<div x-show="page==='assets'">
+  <div class="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div><h1 class="text-xl font-bold">素材ライブラリ</h1><p class="text-sm text-slate-500 mt-0.5">商品画像・背景画像の管理</p></div>
+    <button @click="showAssetModal=true" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700">＋ 素材追加</button>
+  </div>
+  <div class="p-6">
+    <div class="flex gap-1 mb-5 bg-slate-200/60 rounded-lg p-0.5 w-fit">
+      <template x-for="tab in [{k:'all',l:'すべて'},{k:'ProductImage',l:'商品画像'},{k:'Background',l:'背景'}]" :key="tab.k">
+        <button @click="assetTab=tab.k;loadAssets()" :class="assetTab===tab.k?'bg-white text-slate-800 shadow-sm':'text-slate-500 hover:text-slate-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all" x-text="tab.l"></button>
+      </template>
+    </div>
+    <div class="grid grid-cols-5 gap-4">
+      <template x-for="a in filteredAssets" :key="a.id">
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow group">
+          <div class="h-28 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+            <span class="text-2xl" x-text="a.category==='Background'?'🎨':'🖼'"></span>
+          </div>
+          <div class="p-3">
+            <p class="text-xs font-medium truncate" x-text="a.fileName||a.name"></p>
+            <div class="flex justify-between mt-1">
+              <span class="text-[10px] text-slate-400" x-text="formatBytes(a.fileSizeBytes)"></span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="a.category==='Background'?'bg-purple-50 text-purple-600':'bg-sky-50 text-sky-600'" x-text="a.category==='Background'?'背景':'商品'"></span>
+            </div>
+            <button @click="deleteAsset(a.id)" class="mt-2 text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">削除</button>
+          </div>
+        </div>
+      </template>
+      <div x-show="filteredAssets.length===0" class="col-span-5 py-12 text-center text-sm text-slate-400">素材がまだありません。アップロードしてください。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-004 WIZARD ===== -->
+<div x-show="page==='wizard'">
+  <div class="bg-white border-b px-6 py-4"><h1 class="text-xl font-bold">ジョブ作成ウィザード</h1><p class="text-sm text-slate-500 mt-0.5">4ステップでジョブを作成・実行</p></div>
+  <div class="bg-white border-b px-6 py-5">
+    <div class="flex items-center justify-center gap-0 max-w-2xl mx-auto">
+      <template x-for="(s,i) in ['テンプレート選択','データ入力','出力設定','確認・実行']" :key="i">
+        <div class="flex items-center" :class="i<3?'flex-1':''">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" :class="wizardStep>i+1?'bg-green-500 text-white':wizardStep===i+1?'bg-indigo-600 text-white':'bg-slate-200 text-slate-500'" x-text="wizardStep>i+1?'✓':i+1"></div>
+            <span class="text-xs font-medium whitespace-nowrap" :class="wizardStep===i+1?'text-indigo-600':'text-slate-400'" x-text="s"></span>
+          </div>
+          <div x-show="i<3" class="flex-1 h-0.5 mx-3" :class="wizardStep>i+1?'bg-green-400':'bg-slate-200'"></div>
+        </div>
+      </template>
+    </div>
+  </div>
+  <div class="p-6">
+    <!-- Step1: Template -->
+    <div x-show="wizardStep===1" class="max-w-4xl mx-auto">
+      <h2 class="text-lg font-semibold mb-4">テンプレートを選択</h2>
+      <div x-show="templates.length===0" class="text-center py-12 text-slate-400">テンプレートがありません。<button @click="showTemplateModal=true" class="text-indigo-600 underline">先に登録</button>してください。</div>
+      <div class="grid grid-cols-3 gap-4">
+        <template x-for="t in templates" :key="t.id">
+          <div @click="selectedTemplate=t.id" :class="selectedTemplate===t.id?'ring-2 ring-indigo-500 border-indigo-300':'border-slate-200 hover:border-slate-300'" class="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer transition-all">
+            <div class="h-32 flex items-center justify-center relative" :style="'background:linear-gradient(135deg,'+tplColor(t)+'22,'+tplColor(t)+'44)'">
+              <div class="text-center"><div class="w-14 h-10 rounded border-2 border-dashed mx-auto flex items-center justify-center" :style="'border-color:'+tplColor(t)"><span class="text-[10px]" :style="'color:'+tplColor(t)">SVG</span></div></div>
+              <div x-show="selectedTemplate===t.id" class="absolute top-2 right-2 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center"><span class="text-white text-xs">✓</span></div>
+            </div>
+            <div class="p-3"><h3 class="font-semibold text-sm" x-text="t.name"></h3><p class="text-xs text-slate-400 mt-1" x-text="t.width+'x'+t.height+'px'"></p></div>
+          </div>
+        </template>
+      </div>
+      <div class="flex justify-end mt-6"><button @click="wizardStep=2;initWizardStep2()" :disabled="!selectedTemplate" :class="selectedTemplate?'bg-indigo-600 hover:bg-indigo-700 text-white':'bg-slate-200 text-slate-400 cursor-not-allowed'" class="px-6 py-2.5 rounded-lg text-sm font-medium">次へ →</button></div>
+    </div>
+
+    <!-- Step2: Data Input -->
+    <div x-show="wizardStep===2" class="max-w-4xl mx-auto space-y-6">
+      <div class="flex gap-1 bg-slate-200/60 rounded-lg p-0.5 w-fit">
+        <button @click="wizardInputMode='direct'" :class="wizardInputMode==='direct'?'bg-white text-slate-800 shadow-sm':'text-slate-500'" class="px-4 py-1.5 rounded-md text-sm font-medium">直接入力</button>
+        <button @click="wizardInputMode='csv'" :class="wizardInputMode==='csv'?'bg-white text-slate-800 shadow-sm':'text-slate-500'" class="px-4 py-1.5 rounded-md text-sm font-medium">CSV読込</button>
+      </div>
+
+      <!-- Direct input -->
+      <div x-show="wizardInputMode==='direct'" class="space-y-4">
+        <h2 class="text-lg font-semibold">データ入力（レイヤー別）</h2>
+        <template x-for="(row,ri) in wizardDirectRows" :key="ri">
+          <div class="bg-white rounded-xl border p-4">
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-xs font-semibold text-slate-500">行 <span x-text="ri+1"></span></span>
+              <button x-show="wizardDirectRows.length>1" @click="removeDirectRow(ri)" class="text-xs text-red-400 hover:text-red-600">削除</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <template x-for="layer in wizardLayers" :key="layer.id">
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1"><span x-text="layerIcon(layer.type)"></span> <span x-text="layer.id"></span> <span class="text-slate-400" x-text="'('+layer.type+')'"></span></label>
+                  <input type="text" x-model="wizardDirectRows[ri][layer.id]" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" :placeholder="layer.type==='Text'?'テキストを入力':'ファイルパス'">
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        <button @click="addDirectRow()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">＋ 行を追加</button>
+      </div>
+
+      <!-- CSV input -->
+      <div x-show="wizardInputMode==='csv'" class="space-y-4">
+        <h2 class="text-lg font-semibold">CSVアップロード</h2>
+        <div class="drop-zone rounded-xl p-8 text-center bg-white">
+          <div class="text-4xl text-slate-300 mb-3">📄</div>
+          <p class="text-sm text-slate-500">CSVファイルをドロップ、または <label class="text-indigo-600 font-medium cursor-pointer hover:underline">ファイルを選択<input type="file" accept=".csv" @change="handleCsvFile" class="hidden"></label></p>
+          <p class="text-xs text-slate-400 mt-2">UTF-8 / BOM付きUTF-8対応</p>
+        </div>
+        <div x-show="wizardCsvFileName" class="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 flex items-center gap-2">
+          <span class="text-green-600">✓</span>
+          <p class="text-sm text-green-700 font-medium" x-text="wizardCsvFileName+' 読込完了（'+wizardCsvRows.length+'行検出）'"></p>
+        </div>
+        <!-- Mapping -->
+        <div x-show="wizardCsvHeaders.length>0">
+          <h2 class="text-lg font-semibold mb-4">マッピング設定</h2>
+          <div class="bg-white rounded-xl border overflow-hidden">
+            <table class="w-full">
+              <thead><tr class="bg-slate-50 border-b"><th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">レイヤー</th><th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">種別</th><th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">CSV列</th></tr></thead>
+              <tbody class="divide-y divide-slate-100">
+                <template x-for="(m,mi) in wizardMapping" :key="m.layerId">
+                  <tr class="hover:bg-slate-50">
+                    <td class="px-5 py-3 text-sm font-medium"><span x-text="layerIcon(m.layerType)"></span> <span x-text="m.layerId"></span></td>
+                    <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full" :class="m.layerType==='Text'?'bg-blue-50 text-blue-600':'bg-amber-50 text-amber-600'" x-text="m.layerType"></span></td>
+                    <td class="px-5 py-3"><select x-model="wizardMapping[mi].csvColumn" class="text-sm border border-slate-300 rounded-md px-3 py-1.5 w-64 bg-white">
+                      <option value="">-- 選択 --</option>
+                      <template x-for="h in wizardCsvHeaders" :key="h"><option :value="h" x-text="h"></option></template>
+                    </select></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button @click="wizardStep=1" class="px-6 py-2.5 rounded-lg text-sm font-medium border border-slate-300 text-slate-600 hover:bg-slate-50">← 戻る</button>
+        <button @click="wizardStep=3" class="px-6 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">次へ →</button>
+      </div>
+    </div>
+
+    <!-- Step3: Output Settings -->
+    <div x-show="wizardStep===3" class="max-w-3xl mx-auto space-y-6">
+      <h2 class="text-lg font-semibold mb-4">出力設定</h2>
+      <div class="bg-white rounded-xl border p-6 space-y-5">
+        <div><label class="block text-sm font-medium text-slate-700 mb-1.5">ジョブ名</label><input type="text" x-model="wizardJobName" :placeholder="wizardSelectedTemplate?wizardSelectedTemplate.name:'新規ジョブ'" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+        <div class="grid grid-cols-2 gap-5">
+          <div><label class="block text-sm font-medium text-slate-700 mb-1.5">出力フォーマット</label><select x-model="wizardFormat" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm bg-white"><option value="png">PNG（可逆圧縮）</option><option value="jpeg">JPEG（非可逆）</option><option value="webp">WebP（高圧縮）</option></select></div>
+          <div><label class="block text-sm font-medium text-slate-700 mb-1.5">品質</label><div class="flex items-center gap-3"><input type="range" min="50" max="100" x-model="wizardQuality" class="flex-1"><span class="text-sm font-medium text-slate-600 w-10" x-text="wizardQuality+'%'"></span></div></div>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button @click="wizardStep=2" class="px-6 py-2.5 rounded-lg text-sm font-medium border border-slate-300 text-slate-600 hover:bg-slate-50">← 戻る</button>
+        <button @click="wizardStep=4" class="px-6 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">次へ →</button>
+      </div>
+    </div>
+
+    <!-- Step4: Confirm & Execute -->
+    <div x-show="wizardStep===4" class="max-w-4xl mx-auto space-y-6">
+      <h2 class="text-lg font-semibold mb-4">実行内容の確認</h2>
+      <div class="bg-white rounded-xl border p-5">
+        <div class="grid grid-cols-2 gap-y-3 text-sm">
+          <p class="text-slate-500">テンプレート</p><p class="font-medium" x-text="wizardSelectedTemplate?wizardSelectedTemplate.name:'-'"></p>
+          <p class="text-slate-500">入力件数</p><p class="font-medium" x-text="wizardInputCount+'行'"></p>
+          <p class="text-slate-500">入力モード</p><p class="font-medium" x-text="wizardInputMode==='csv'?'CSV（'+wizardCsvFileName+'）':'直接入力'"></p>
+          <p class="text-slate-500">出力フォーマット</p><p class="font-medium" x-text="wizardFormat.toUpperCase()+' / 品質'+wizardQuality+'%'"></p>
+          <p class="text-slate-500">ジョブ名</p><p class="font-medium" x-text="wizardJobName||(wizardSelectedTemplate?wizardSelectedTemplate.name:'新規ジョブ')"></p>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button @click="wizardStep=3" class="px-6 py-2.5 rounded-lg text-sm font-medium border border-slate-300 text-slate-600 hover:bg-slate-50">← 戻る</button>
+        <button @click="executeJob()" class="px-8 py-2.5 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 flex items-center gap-2">▶ ジョブ実行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-005 JOB LIST ===== -->
+<div x-show="page==='jobs'">
+  <div class="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div><h1 class="text-xl font-bold">ジョブ一覧</h1><p class="text-sm text-slate-500 mt-0.5">全ジョブの状態確認・操作</p></div>
+    <button @click="navigate('wizard')" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700">＋ 新規ジョブ作成</button>
+  </div>
+  <div class="p-6">
+    <div class="flex gap-1 mb-5 bg-slate-200/60 rounded-lg p-0.5 w-fit">
+      <template x-for="f in [{k:'all',l:'すべて'},{k:'Running',l:'実行中'},{k:'Completed',l:'完了'},{k:'Failed',l:'失敗'}]" :key="f.k">
+        <button @click="jobStatusFilter=f.k" :class="jobStatusFilter===f.k?'bg-white text-slate-800 shadow-sm':'text-slate-500 hover:text-slate-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all" x-text="f.l"></button>
+      </template>
+    </div>
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <table class="w-full">
+        <thead><tr class="bg-slate-50 border-b">
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">ID</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">ジョブ名</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">テンプレート</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">ステータス</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">進捗</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">作成日時</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">操作</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          <template x-for="job in filteredJobs" :key="job.id">
+            <tr class="hover:bg-slate-50 cursor-pointer" @click="goToJobDetail(job.id)">
+              <td class="px-5 py-3 text-sm font-mono text-indigo-600 font-medium" x-text="shortId(job.id)"></td>
+              <td class="px-5 py-3 text-sm font-medium" x-text="job.name"></td>
+              <td class="px-5 py-3 text-sm text-slate-500" x-text="job.templateName||'-'"></td>
+              <td class="px-5 py-3"><span class="text-xs px-2.5 py-1 rounded-full font-medium" :class="statusClass(job.status)" x-text="statusLabel(job.status)"></span></td>
+              <td class="px-5 py-3"><div class="flex items-center gap-2"><div class="w-24 bg-slate-200 rounded-full h-1.5 overflow-hidden"><div class="h-full rounded-full transition-all" :class="job.status==='Running'?'bg-blue-500 progress-shimmer':job.status==='Completed'?'bg-green-500':job.status==='Failed'?'bg-red-500':'bg-slate-400'" :style="'width:'+progressPercent(job)+'%'"></div></div><span class="text-xs text-slate-500 w-14" x-text="(job.processedCount||0)+'/'+(job.totalCount||0)"></span></div></td>
+              <td class="px-5 py-3 text-xs text-slate-400" x-text="formatDate(job.createdAt)"></td>
+              <td class="px-5 py-3" @click.stop><button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium" @click="goToJobDetail(job.id)">詳細</button></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <div x-show="filteredJobs.length===0" class="px-5 py-8 text-center text-sm text-slate-400">該当するジョブがありません</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-006 JOB DETAIL ===== -->
+<div x-show="page==='job-detail'&&selectedJob">
+  <div class="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <button @click="navigate('jobs')" class="text-slate-400 hover:text-slate-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+      <div>
+        <div class="flex items-center gap-3"><h1 class="text-xl font-bold" x-text="shortId(selectedJob.id)+' '+selectedJob.name"></h1><span class="text-xs px-2.5 py-1 rounded-full font-medium" :class="statusClass(selectedJob.status)" x-text="statusLabel(selectedJob.status)"></span></div>
+        <p class="text-sm text-slate-500 mt-0.5" x-text="'テンプレート: '+(selectedJob.templateName||'-')+' · 作成: '+formatDate(selectedJob.createdAt)"></p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button x-show="selectedJob.status==='Running'" @click="cancelJob(selectedJob.id)" class="bg-red-50 text-red-600 border border-red-200 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-100">キャンセル</button>
+      <button x-show="selectedJob.status==='Failed'" @click="retryJob(selectedJob.id)" class="bg-amber-50 text-amber-600 border border-amber-200 rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-100">エラー分のみ再実行</button>
+      <button x-show="selectedJob.status==='Completed'||selectedJob.status==='CompletedWithWarning'" @click="downloadJob(selectedJob.id)" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700">⬇ ZIPダウンロード</button>
+    </div>
+  </div>
+  <div class="p-6 space-y-6">
+    <div class="bg-white rounded-xl border p-6">
+      <div class="flex items-end justify-between mb-3">
+        <p class="text-4xl font-bold" x-text="progressPercent(selectedJob)+'%'"></p>
+        <p class="text-sm text-slate-500" x-text="(selectedJob.processedCount||0).toLocaleString()+' / '+(selectedJob.totalCount||0).toLocaleString()+'件'"></p>
+      </div>
+      <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-500" :class="selectedJob.status==='Running'?'bg-indigo-500 progress-shimmer':selectedJob.status==='Completed'?'bg-green-500':selectedJob.status==='Failed'?'bg-red-500':'bg-slate-400'" :style="'width:'+progressPercent(selectedJob)+'%'"></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl border p-4 text-center"><p class="text-2xl font-bold text-green-600" x-text="(selectedJob.successCount||0).toLocaleString()"></p><p class="text-xs text-slate-500 mt-1">成功</p></div>
+      <div class="bg-white rounded-xl border p-4 text-center"><p class="text-2xl font-bold text-amber-500" x-text="selectedJob.warningCount||0"></p><p class="text-xs text-slate-500 mt-1">警告</p></div>
+      <div class="bg-white rounded-xl border p-4 text-center"><p class="text-2xl font-bold text-red-500" x-text="selectedJob.errorCount||0"></p><p class="text-xs text-slate-500 mt-1">エラー</p></div>
+      <div class="bg-white rounded-xl border p-4 text-center"><p class="text-2xl font-bold text-slate-400" x-text="selectedJob.skippedCount||0"></p><p class="text-xs text-slate-500 mt-1">スキップ</p></div>
+    </div>
+    <div class="bg-white rounded-xl border p-5">
+      <h3 class="font-semibold text-slate-700 mb-3">ジョブ情報</h3>
+      <div class="grid grid-cols-2 gap-y-2 text-sm">
+        <p class="text-slate-500">ジョブID</p><p class="font-mono text-xs" x-text="selectedJob.id"></p>
+        <p class="text-slate-500">ステータス</p><p class="font-medium" x-text="statusLabel(selectedJob.status)"></p>
+        <p class="text-slate-500">作成日時</p><p x-text="formatDate(selectedJob.createdAt)"></p>
+        <p class="text-slate-500">開始日時</p><p x-text="formatDate(selectedJob.startedAt)"></p>
+        <p class="text-slate-500">完了日時</p><p x-text="formatDate(selectedJob.completedAt)"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-008 SETTINGS ===== -->
+<div x-show="page==='settings'">
+  <div class="bg-white border-b px-6 py-4"><h1 class="text-xl font-bold">設定</h1><p class="text-sm text-slate-500 mt-0.5">出力先・バッチ処理の設定</p></div>
+  <div class="p-6 max-w-3xl space-y-6">
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <div class="px-5 py-4 border-b bg-slate-50"><h2 class="font-semibold text-slate-700">ストレージ設定</h2></div>
+      <div class="p-5 space-y-4">
+        <div><label class="block text-sm font-medium text-slate-700 mb-1.5">画像出力先</label><input type="text" value="data/output" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm font-mono" readonly></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-1.5">素材保存先</label><input type="text" value="data/assets" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm font-mono" readonly></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <div class="px-5 py-4 border-b bg-slate-50"><h2 class="font-semibold text-slate-700">バッチ処理設定</h2></div>
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-slate-700 mb-1.5">並列ワーカー数</label><input type="text" value="4" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm" readonly></div>
+          <div><label class="block text-sm font-medium text-slate-700 mb-1.5">リトライ上限</label><input type="text" value="3" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm" readonly></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCR-007 LOGS (simplified) ===== -->
+<div x-show="page==='logs'">
+  <div class="bg-white border-b px-6 py-4"><h1 class="text-xl font-bold">ログビューア</h1><p class="text-sm text-slate-500 mt-0.5">ジョブ実行ログ（簡易表示）</p></div>
+  <div class="p-6">
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <table class="w-full">
+        <thead><tr class="bg-slate-50 border-b">
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">ジョブ</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">ステータス</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">成功/警告/エラー</th>
+          <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">作成日時</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          <template x-for="job in jobs" :key="job.id">
+            <tr class="hover:bg-slate-50 cursor-pointer" @click="goToJobDetail(job.id)">
+              <td class="px-5 py-3 text-sm"><span class="font-mono text-indigo-600" x-text="shortId(job.id)"></span> <span x-text="job.name"></span></td>
+              <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="statusClass(job.status)" x-text="statusLabel(job.status)"></span></td>
+              <td class="px-5 py-3 text-sm"><span class="text-green-600" x-text="job.successCount||0"></span> / <span class="text-amber-500" x-text="job.warningCount||0"></span> / <span class="text-red-500" x-text="job.errorCount||0"></span></td>
+              <td class="px-5 py-3 text-xs text-slate-400" x-text="formatDate(job.createdAt)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- ===== MODAL: Template Registration ===== -->
+<div x-show="showTemplateModal" class="fixed inset-0 z-50 flex items-center justify-center" x-transition>
+  <div class="absolute inset-0 bg-black/40" @click="showTemplateModal=false"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+    <h2 class="text-lg font-bold">テンプレート登録</h2>
+    <div><label class="block text-sm font-medium text-slate-700 mb-1">名前 *</label><input type="text" x-model="newTemplate.name" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="商品バナー2026"></div>
+    <div><label class="block text-sm font-medium text-slate-700 mb-1">説明</label><input type="text" x-model="newTemplate.description" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm outline-none" placeholder="任意"></div>
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="block text-sm font-medium text-slate-700 mb-1">幅 (px)</label><input type="number" x-model.number="newTemplate.width" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm outline-none"></div>
+      <div><label class="block text-sm font-medium text-slate-700 mb-1">高さ (px)</label><input type="number" x-model.number="newTemplate.height" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm outline-none"></div>
+    </div>
+    <div><label class="block text-sm font-medium text-slate-700 mb-1">レイヤー設定 (JSON)</label><textarea x-model="newTemplate.layerConfigJson" rows="5" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-500"></textarea><p class="text-[10px] text-slate-400 mt-1">layers[].id がデータ入力のキーになります（例: title, subtitle）</p></div>
+    <div class="flex justify-end gap-3">
+      <button @click="showTemplateModal=false" class="px-4 py-2 rounded-lg text-sm border border-slate-300 text-slate-600 hover:bg-slate-50">キャンセル</button>
+      <button @click="registerTemplate()" :disabled="!newTemplate.name" :class="newTemplate.name?'bg-indigo-600 hover:bg-indigo-700 text-white':'bg-slate-200 text-slate-400 cursor-not-allowed'" class="px-6 py-2 rounded-lg text-sm font-medium">登録</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Asset Upload ===== -->
+<div x-show="showAssetModal" class="fixed inset-0 z-50 flex items-center justify-center" x-transition>
+  <div class="absolute inset-0 bg-black/40" @click="showAssetModal=false"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+    <h2 class="text-lg font-bold">素材アップロード</h2>
+    <div><label class="block text-sm font-medium text-slate-700 mb-1">カテゴリ</label>
+      <select x-model="assetUploadCategory" class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm bg-white"><option value="ProductImage">商品画像</option><option value="Background">背景</option></select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">単体アップロード</label>
+      <input type="file" accept="image/*" @change="handleAssetUpload" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">ZIP一括アップロード</label>
+      <input type="file" accept=".zip" @change="handleZipUpload" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+    </div>
+    <div class="flex justify-end"><button @click="showAssetModal=false" class="px-4 py-2 rounded-lg text-sm border border-slate-300 text-slate-600 hover:bg-slate-50">閉じる</button></div>
+  </div>
+</div>
+
+</body>
+</html>

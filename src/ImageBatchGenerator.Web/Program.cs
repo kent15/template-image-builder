@@ -86,6 +86,10 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseCors();
 
+// 静的ファイル配信（wwwroot/index.html をフロントエンドとして配信）
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // TODO: Phase 3 — SignalR hub（ProgressHub）
 
 app.UseAuthorization();

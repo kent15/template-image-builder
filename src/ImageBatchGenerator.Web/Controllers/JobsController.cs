@@ -1,5 +1,6 @@
 using ImageBatchGenerator.Application.DTOs;
 using ImageBatchGenerator.Application.UseCases.Jobs;
+using ImageBatchGenerator.Domain.Entities;
 using ImageBatchGenerator.Domain.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,6 +14,7 @@ namespace ImageBatchGenerator.Web.Controllers;
 public class JobsController : ControllerBase
 {
     private readonly IJobRepository _jobRepository;
+    private readonly ITemplateRepository _templateRepository;
     private readonly IStorageService _storageService;
     private readonly CreateJobUseCase _createJobUseCase;
     private readonly StartJobUseCase _startJobUseCase;
@@ -22,6 +24,7 @@ public class JobsController : ControllerBase
 
     public JobsController(
         IJobRepository jobRepository,
+        ITemplateRepository templateRepository,
         IStorageService storageService,
         CreateJobUseCase createJobUseCase,
         StartJobUseCase startJobUseCase,
@@ -30,6 +33,7 @@ public class JobsController : ControllerBase
         GetJobProgressUseCase getJobProgressUseCase)
     {
         _jobRepository = jobRepository;
+        _templateRepository = templateRepository;
         _storageService = storageService;
         _createJobUseCase = createJobUseCase;
         _startJobUseCase = startJobUseCase;
@@ -38,12 +42,14 @@ public class JobsController : ControllerBase
         _getJobProgressUseCase = getJobProgressUseCase;
     }
 
-    /// <summary>ジョブ一覧を取得する</summary>
+    /// <summary>ジョブ一覧を取得する（テンプレート名付き）</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
         var jobs = await _jobRepository.GetAllAsync(ct);
-        var dtos = jobs.Select(j => j.ToDto());
+        var templates = await _templateRepository.GetAllActiveAsync(ct);
+        var templateMap = templates.ToDictionary(t => t.Id, t => t.Name);
+        var dtos = jobs.Select(j => EnrichWithTemplateName(j, templateMap));
         return Ok(dtos);
     }
 
@@ -53,7 +59,17 @@ public class JobsController : ControllerBase
     {
         var job = await _jobRepository.GetByIdAsync(id, ct);
         if (job is null) return NotFound();
-        return Ok(job.ToDto());
+        var template = await _templateRepository.GetByIdAsync(job.TemplateId, ct);
+        var dto = job.ToDto() with { TemplateName = template?.Name ?? "" };
+        return Ok(dto);
+    }
+
+    private static JobDto EnrichWithTemplateName(Job job, Dictionary<Guid, string> templateMap)
+    {
+        var dto = job.ToDto();
+        return templateMap.TryGetValue(job.TemplateId, out var name)
+            ? dto with { TemplateName = name }
+            : dto;
     }
 
     /// <summary>
